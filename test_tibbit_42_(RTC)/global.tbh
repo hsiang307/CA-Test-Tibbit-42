@@ -1,0 +1,23 @@
+'DEFINES-------------------------------------------------------------
+
+#IF PLATFORM_ID=TPP2WG2 OR PLATFORM_ID=TPP3WG2 OR PLATFORM_ID=TPP2W OR PLATFORM_ID=TPP3W
+	#define TBT42_SPI_CS PL_IO_NUM_9_TX0
+	#define TBT42_SPI_CLK PL_IO_NUM_8_RX0
+	#define TBT42_SPI_MOSI PL_IO_NUM_0
+	#define TBT42_SPI_MISO PL_IO_NUM_16_INT0
+#ELSE
+	XXXX 'Unsupported platform
+#ENDIF
+
+const CR_LF=chr(13)+chr(10)
+
+'INCLUDES------------------------------------------------------------
+include "super_spi.tbh"
+include "ssi\trunk\ssi.tbh"
+include "tbt42.tbh"
+
+'DECLARATIONS--------------------------------------------------------
+
+'INCLUDES------------------------------------------------------------
+
+'DECLARATIONS--------------------------------------------------------

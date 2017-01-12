@@ -1,0 +1,139 @@
+include "global.tbh"
+
+'This is the list of test cases available in this application. These tests use sys.debugprint so run them in debug mode
+enum test_modes
+	TEST_RTC_SET					'Set the RTC to the date and time of your choosing. See below at TEST_SET_RTC: for the actual date and time you will set.
+	TEST_RTC_GET,					'This test will repeatedly print the current date and time.
+	TEST_ALARM_EVERY_SEC,			'This test demonstrates how to set the alarm which will occur every second [NOTE 1].
+	TEST_ALARM_EVERY_MIN,			'This test demonstrates how to set the alaram which will occur on the 5th second of every minute [NOTE 1].
+	TEST_ALARM_AT_PRESET_DATE_TIME, 'This test demonstrates how to set the alarm which will occur at specific date and time [NOTE 1].
+	TEST_TEMP,						'This test will repeatedly print the current temperature reported by the RTC's internal sensor [NOTE 2].
+	TEST_NVRAM						'This test will write incrementing values to the NVRAM locations 0~255 and then verify the stored data.
+end enum
+'NOTE 1: Alarm interrupts are responded to by the on_io_int() event handler (it is near the bottom of this file).
+'NOTE 2: The current temperature is not updated with each read from the temp register. Updates happen every once in every 64 seconds.
+
+'--------------------------------------------------------------------
+declare function tostr(v as byte) as string
+
+dim test_item as test_modes
+
+'====================================================================
+sub on_sys_init()
+	dim dayc,minc as word
+	dim sec as byte
+	dim flag as no_yes=NO
+	dim yr as word
+	dim mon,dt,hr,min as byte
+	dim f as word
+	
+	select case tbt42_init(NO)
+	case TBT42_SELF_TEST_FAIL:
+		sys.debugprint("Self test fail for the RTC Backup module (#42)."+CR_LF)	
+
+	case TBT42_NO_SSI_AVAILABLE:
+		sys.debugprint("SSI channel could not be allocated for the RTC Backup module (#42), using bit banging instead."+CR_LF)
+
+	end select
+
+	test_item=TEST_NVRAM '<<====================================== SELECT DESIRED TEST CASE HERE
+
+	select case test_item
+	case TEST_RTC_SET:
+		yr=2014		'year	 <<====================================== SET THE DATE AND TIME YOU WANT TO SET HERE
+		mon=11		'month
+		dt=10		'date
+		hr=09		'hours
+		min=22		'minutes
+		sec=00		'seconds
+	
+		sys.debugprint("Setting date/time to "+str(yr)+"-"+tostr(mon)+"-"+tostr(dt)+" "+tostr(hr)+":"+tostr(min)+":"+tostr(sec)+CR_LF)
+
+		dayc=daycount(yr-2000,mon,dt)
+		minc=mincount(hr,min)
+		tbt42_rtc_set(dayc,minc,sec)
+
+		sys.debugprint("Done"+CR_LF)
+		sys.halt
+
+	case TEST_RTC_GET:
+		while 1
+			tbt42_rtc_get(dayc,minc,sec)
+			sys.debugprint(str(2000+year(dayc))+"-"+tostr(month(dayc))+"-"+tostr(date(dayc))+" "+tostr(hours(minc))+":"+tostr(minutes(minc))+":"+tostr(sec)+CR_LF)
+		wend
+	
+	case TEST_ALARM_EVERY_SEC:
+		tbt42_alarm_set(0,0,0,YES) 
+		goto alarm_common
+
+	case TEST_ALARM_EVERY_MIN:
+		tbt42_alarm_set(0,0,5,YES) 
+		goto alarm_common
+
+	case TEST_ALARM_AT_PRESET_DATE_TIME:
+		'Read the current date/time and set the alarm to trigger one minute later
+		tbt42_rtc_get(dayc,minc,sec)
+		
+		sys.debugprint("Current date and time: "+str(2000+year(dayc))+"-"+tostr(month(dayc))+"-"+tostr(date(dayc))+" "+tostr(hours(minc))+":"+tostr(minutes(minc))+":"+tostr(sec)+CR_LF)
+		
+		minc=minc+1
+		if minc>=24*60 then
+			minc=0
+			dayc=dayc+1
+		end if
+
+		sys.debugprint("Setting alarm to "+str(2000+year(dayc))+"-"+tostr(month(dayc))+"-"+tostr(date(dayc))+" "+tostr(hours(minc))+":"+tostr(minutes(minc))+":"+tostr(sec)+" (1 minute later)"+CR_LF)
+
+		tbt42_alarm_set(dayc,minc,sec,YES)
+
+alarm_common:
+		'This part is not necessary. We put it here to illustrate the use of tbt42_alarm_setting_get()
+		if tbt42_alarm_setting_get(dayc,minc,sec)<>NO then
+			sys.debugprint("Alarm was set to "+str(2000+year(dayc))+"-"+tostr(month(dayc))+"-"+tostr(date(dayc))+" "+tostr(hours(minc))+":"+tostr(minutes(minc))+":"+tostr(sec)+CR_LF)
+		else
+			sys.debugprint("Alarm was disabled"+CR_LF)
+		end if
+
+		'This is the part that actually handles alarms
+		while 1
+			if tbt42_alarm_waiting()=OK then	
+				tbt42_rtc_get(dayc,minc,sec)
+				sys.debugprint("Alarm on "+str(2000+year(dayc))+"-"+tostr(month(dayc))+"-"+tostr(date(dayc))+" at "+tostr(hours(minc))+":"+tostr(minutes(minc))+":"+tostr(sec)+CR_LF)
+			end if
+		wend
+		
+	case TEST_TEMP:
+		dim t as real
+		while 1
+			t=tbt42_temp_get()
+			sys.debugprint(ftostr(t,FTOSTR_MODE_AUTO,5)+" degrees C"+CR_LF)
+		wend
+	
+	case TEST_NVRAM:
+		sys.debugprint("Performing NVRAM test..."+CR_LF)
+		for f=0 to 255
+			tbt42_nvram_write(f,f)
+		next f
+	
+		dim dd as byte
+		
+		for f=0 to 255
+			dd=tbt42_nvram_read(f)
+			if dd<>f then
+				sys.debugprint("NVRAM test failed at address "+hex(f)+"("+str(f)+","+str(dd)+")"+CR_LF)
+				sys.halt
+			end if
+		next f
+		sys.debugprint("NVRAM test passed"+CR_LF)
+	
+	end select
+	
+end sub
+
+function tostr(v as byte) as string
+	tostr=str(v)
+	if len(tostr)=1 then
+		tostr="0"+tostr
+	end if
+end function
+
