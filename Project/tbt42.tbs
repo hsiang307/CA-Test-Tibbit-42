@@ -92,7 +92,7 @@ function tbt42_init(use_ssi as no_yes)as errcheck
 		ssi.domap=TBT42_SPI_MOSI
 		ssi.zmode=PL_SSI_ZMODE_ALWAYS_ENABLED
 		ssi.direction=PL_SSI_DIRECTION_LEFT
-		ssi.baudrate=1
+		ssi.baudrate=PL_SSI_BAUDRATES_1MHz
 		ssi.enabled=YES
 	else
 		if use_ssi=YES then

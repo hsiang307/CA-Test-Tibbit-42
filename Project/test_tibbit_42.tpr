@@ -73,11 +73,13 @@ location=project
 path=super_spi\trunk\super_spi.tbh
 type=header
 format=
+condition=
 locked=yes
 location=commonlib
 [file8]
 path=super_spi\trunk\super_spi.tbs
 type=basic
 format=
+condition=
 locked=yes
 location=commonlib
